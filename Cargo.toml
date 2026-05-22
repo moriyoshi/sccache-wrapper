@@ -1,0 +1,21 @@
+[package]
+name = "sccache-wrapper"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "RUSTC_WRAPPER that adds cross-worktree Rust compilation caching on top of sccache by normalising workspace-dependent rustc arguments before hashing"
+repository = "https://github.com/moriyoshi/sccache-wrapper"
+keywords = ["sccache", "rustc", "cache", "build", "worktree"]
+categories = ["development-tools::build-utils", "caching"]
+readme = "README.md"
+
+[dependencies]
+sha2 = "0.10"
+fslock = "0.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sysinfo = { version = "0.32", default-features = false, features = ["system"] }
+
+[[bin]]
+name = "sccache-wrapper"
+path = "src/main.rs"
