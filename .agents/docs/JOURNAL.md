@@ -10,12 +10,12 @@ What carried over verbatim:
 
 - `src/main.rs`, `src/scoreboard.rs` — no code changes.
 - `README.md` — still references `WB_*` env vars (see TODO).
-- Apache-2.0 LICENSE.
+- MIT LICENSE.
 
 What changed:
 
 - `Cargo.toml` is now standalone (no workspace inheritance). Inlined explicit versions for `sha2`, `fslock`, `serde`, `serde_json`, `sysinfo`. Removed `publish = false`. Added `repository`, `keywords`, `categories`, `readme`.
-- Added Apache-2.0 LICENSE, `.gitignore` (target/ only; `Cargo.lock` committed for the binary).
+- Added LICENSE, `.gitignore` (target/ only; `Cargo.lock` committed for the binary).
 
 Verified: `cargo build --release`, `cargo clippy --all-targets -- -D warnings`, `cargo fmt -- --check` all pass.
 
