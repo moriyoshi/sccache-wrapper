@@ -18,3 +18,7 @@
 ## Integration with winterbaume
 
 - [ ] Decide whether winterbaume keeps an in-tree vendored copy or switches to a published `cargo install sccache-wrapper` / git dep. Either way, the in-tree copy at `winterbaume/tools/sccache-wrapper/` is now a fork point — drift will accumulate. Pick a direction soon.
+
+## Open Items
+
+- [ ] Exercise the ported memory-consolidation skills end-to-end and tune topic examples / file-path assumptions if needed. *source: 2026-05-23 — Ported memory-consolidation skills from winterbaume*
