@@ -1,0 +1,142 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  changes:
+    name: Detect relevant changes
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d  # v4.0.1
+        id: filter
+        with:
+          filters: |
+            code:
+              - 'src/**'
+              - 'tests/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - 'rustfmt.toml'
+              - '.github/workflows/ci.yml'
+              - '.github/actions/**'
+
+  # Hash the code-relevant tree and probe per-job cache markers. A marker for
+  # `ci-pass-<job>-<os>-<hash>` exists only when a prior run finished that job
+  # successfully against the exact same source tree; in that case the job
+  # below is skipped via its own `if:`, and downstream jobs use `!failure() &&
+  # !cancelled()` so a `skipped` upstream still lets them run.
+  fingerprint:
+    name: Fingerprint and probe prior-pass markers
+    runs-on: ubuntu-latest
+    needs:
+      - changes
+    if: |
+      github.event_name != 'push' ||
+      needs.changes.outputs.code == 'true'
+    outputs:
+      hash: ${{ steps.hash.outputs.value }}
+      fmt-hit: ${{ steps.fmt.outputs.hit }}
+      clippy-hit: ${{ steps.clippy.outputs.hit }}
+      test-hit: ${{ steps.test.outputs.hit }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+      - id: hash
+        run: |
+          echo "value=${{ hashFiles('src/**', 'tests/**', 'Cargo.toml', 'Cargo.lock', 'rustfmt.toml', '.github/workflows/ci.yml', '.github/actions/**') }}" >> "$GITHUB_OUTPUT"
+      - id: fmt
+        uses: ./.github/actions/probe-pass-marker
+        with:
+          job: fmt
+          hash: ${{ steps.hash.outputs.value }}
+      - id: clippy
+        uses: ./.github/actions/probe-pass-marker
+        with:
+          job: clippy
+          hash: ${{ steps.hash.outputs.value }}
+      - id: test
+        uses: ./.github/actions/probe-pass-marker
+        with:
+          job: test
+          hash: ${{ steps.hash.outputs.value }}
+
+  fmt:
+    name: Rustfmt
+    runs-on: ubuntu-latest
+    needs:
+      - changes
+      - fingerprint
+    if: |
+      needs.fingerprint.outputs.fmt-hit != 'true' && (
+        github.event_name != 'push' ||
+        needs.changes.outputs.code == 'true'
+      )
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+      - uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6  # v1.16
+        with:
+          components: rustfmt
+      - run: cargo fmt --all --check
+      - uses: ./.github/actions/save-pass-marker
+        with:
+          job: fmt
+          hash: ${{ needs.fingerprint.outputs.hash }}
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    needs:
+      - changes
+      - fingerprint
+      - fmt
+    if: |
+      !failure() && !cancelled() &&
+      needs.fingerprint.outputs.clippy-hit != 'true' && (
+        github.event_name != 'push' ||
+        needs.changes.outputs.code == 'true'
+      )
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+      - uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6  # v1.16
+        with:
+          components: clippy
+      - run: cargo clippy --all-targets --all-features -- -D warnings
+      - uses: ./.github/actions/save-pass-marker
+        with:
+          job: clippy
+          hash: ${{ needs.fingerprint.outputs.hash }}
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    needs:
+      - changes
+      - fingerprint
+      - clippy
+    if: |
+      !failure() && !cancelled() &&
+      needs.fingerprint.outputs.test-hit != 'true' && (
+        github.event_name != 'push' ||
+        needs.changes.outputs.code == 'true'
+      )
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+      - uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6  # v1.16
+      - run: cargo test --no-fail-fast
+      - uses: ./.github/actions/save-pass-marker
+        with:
+          job: test
+          hash: ${{ needs.fingerprint.outputs.hash }}

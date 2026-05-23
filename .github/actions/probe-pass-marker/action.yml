@@ -1,0 +1,29 @@
+name: Probe per-job pass marker
+description: >-
+  Look up (without restoring) the `ci-pass-<job>-<os>-<hash>` cache marker.
+  The `hit` output is "true" when a prior CI run finished that job
+  successfully against the same source tree, allowing the dependent job to
+  short-circuit via its own `if:`.
+
+inputs:
+  job:
+    description: Job name, used in the cache key.
+    required: true
+  hash:
+    description: Source-tree hash, used in the cache key.
+    required: true
+
+outputs:
+  hit:
+    description: '"true" when the marker exists, otherwise empty.'
+    value: ${{ steps.lookup.outputs.cache-hit }}
+
+runs:
+  using: composite
+  steps:
+    - id: lookup
+      uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
+      with:
+        path: .ci-marker
+        key: ci-pass-${{ inputs.job }}-${{ runner.os }}-${{ inputs.hash }}
+        lookup-only: true

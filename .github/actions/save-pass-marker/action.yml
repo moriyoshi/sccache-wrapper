@@ -1,0 +1,25 @@
+name: Save per-job pass marker
+description: >-
+  Write a tiny marker file and store it under the
+  `ci-pass-<job>-<os>-<hash>` cache key so future runs against the same
+  source tree can skip this job via `probe-pass-marker`.
+
+inputs:
+  job:
+    description: Job name, used in the cache key.
+    required: true
+  hash:
+    description: Source-tree hash, used in the cache key and marker contents.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        mkdir -p .ci-marker
+        printf '%s\n' "${{ inputs.hash }}" > .ci-marker/marker
+    - uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
+      with:
+        path: .ci-marker
+        key: ci-pass-${{ inputs.job }}-${{ runner.os }}-${{ inputs.hash }}
